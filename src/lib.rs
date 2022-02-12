@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::fmt;
 
 use num_bigint::BigInt;
 use num_rational::BigRational;
-use priority_queue::PriorityQueue;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Stone {
@@ -147,61 +145,65 @@ impl From<usize> for Chance {
     }
 }
 
-pub fn search() {
-    let mut queue = PriorityQueue::new();
-    let mut known = HashSet::new();
-    let mut track = HashMap::new();
+const ROLLS: u8 = 10;
+const GOOD: u8 = 7;
+const BAD: u8 = 4;
 
-    queue.push(
-        Stone::default(),
-        BigRational::new(BigInt::from(1u8), BigInt::from(1u8)),
-    );
+pub fn evaluate(stone: Stone) -> (usize, BigRational) {
+    let mut max_line = 0;
+    let mut max_value = BigRational::new(BigInt::from(0u8), BigInt::from(1u8));
+    let mut cache = HashMap::new();
 
-    while let Some((stone, probability)) = queue.pop() {
-        if !known.insert(stone) {
-            continue;
-        }
-
-        if stone.lines[0] >= 7 && stone.lines[1] >= 7 && stone.lines[2] <= 4 {
-            let mut stones = vec![stone];
-            let mut next = stone;
-
-            while let Some(prev) = track.get(&next).copied() {
-                stones.push(prev);
-                next = prev;
-            }
-
-            stones.reverse();
-
-            for stone in stones {
-                println!("{}", stone);
-            }
-
-            return;
-        }
-
-        for line in (0..3).filter(|line| stone.rolls[*line] < 10) {
-            let success = stone.succeed(line);
-            let success_probabilty = stone.chance.to_probability_success() * &probability;
-
-            if match queue.get_priority(&success) {
-                None => true,
-                Some(probability) => success_probabilty > *probability,
-            } {
-                queue.push(success, success_probabilty);
-                track.insert(success, stone);
-            }
-
-            let failure = stone.fail(line);
-            let failure_probability = stone.chance.to_probability_failure() * &probability;
-
-            if match queue.get_priority(&failure) {
-                None => true,
-                Some(probability) => failure_probability > *probability,
-            } {
-                queue.push(failure, failure_probability);
-                track.insert(failure, stone);
-            }
+    for line in 0..3 {
+        let value = recurse_weighted(stone, &mut cache, line);
+        if value > max_value {
+            max_line = line;
+            max_value = value;
         }
     }
+
+    (max_line, max_value)
+}
+
+fn recurse_weighted(
+    stone: Stone,
+    cache: &mut HashMap<Stone, BigRational>,
+    line: usize,
+) -> BigRational {
+    stone.chance.to_probability_success() * recurse(stone.succeed(line), cache)
+        + stone.chance.to_probability_failure() * recurse(stone.fail(line), cache)
+}
+
+fn recurse(stone: Stone, cache: &mut HashMap<Stone, BigRational>) -> BigRational {
+    if let Some(value) = cache.get(&stone) {
+        return value.clone();
+    }
+
+    dbg!(cache.len());
+
+    // Terminal state: success
+    if stone.lines[0] >= GOOD
+        && stone.lines[1] >= GOOD
+        && stone.rolls[2] == ROLLS
+        && stone.lines[2] <= BAD
+    {
+        return BigRational::new(BigInt::from(1i8), BigInt::from(1i8));
+    }
+
+    // Terminal state: failure
+    if ROLLS - stone.rolls[0] + stone.lines[0] < GOOD
+        || ROLLS - stone.rolls[1] + stone.lines[1] < GOOD
+        || stone.lines[2] > BAD
+    {
+        return BigRational::new(BigInt::from(0u8), BigInt::from(1u8));
+    }
+
+    let max = (0..3)
+        .filter(|line| stone.rolls[*line] < ROLLS)
+        .map(|line| recurse_weighted(stone, cache, line))
+        .max()
+        .unwrap_or_else(|| BigRational::new(BigInt::from(0u8), BigInt::from(1u8)));
+
+    cache.insert(stone, max.clone());
+    max
 }

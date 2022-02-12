@@ -1,3 +1,4 @@
 fn main() {
-    facet::search();
+    let (line, value) = facet::evaluate(facet::Stone::default());
+    println!("{}: {}", line, value);
 }
