@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use num_bigint::BigInt;
-use num_rational::BigRational;
-use once_cell::sync::Lazy;
-
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Stone {
     chance: Chance,
@@ -61,16 +57,6 @@ pub enum Chance {
     P75,
 }
 
-static P25: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(25), BigInt::from(100)));
-static P35: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(35), BigInt::from(100)));
-static P45: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(45), BigInt::from(100)));
-static P55: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(55), BigInt::from(100)));
-static P65: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(65), BigInt::from(100)));
-static P75: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(75), BigInt::from(100)));
-
-static ONE: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(1), BigInt::from(1)));
-static ZERO: Lazy<BigRational> = Lazy::new(|| BigRational::new(BigInt::from(0), BigInt::from(1)));
-
 impl fmt::Display for Chance {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let chance = match self {
@@ -115,39 +101,25 @@ impl Chance {
         }
     }
 
-    pub fn to_probability_success(&self) -> &'static BigRational {
+    pub fn success(&self) -> u128 {
         match self {
-            Chance::P25 => &*P25,
-            Chance::P35 => &*P35,
-            Chance::P45 => &*P45,
-            Chance::P55 => &*P55,
-            Chance::P65 => &*P65,
-            Chance::P75 => &*P75,
+            Chance::P25 => 5,
+            Chance::P35 => 7,
+            Chance::P45 => 9,
+            Chance::P55 => 11,
+            Chance::P65 => 13,
+            Chance::P75 => 15,
         }
     }
 
-    pub fn to_probability_failure(&self) -> &'static BigRational {
+    pub fn failure(&self) -> u128 {
         match self {
-            Chance::P25 => &*P75,
-            Chance::P35 => &*P65,
-            Chance::P45 => &*P55,
-            Chance::P55 => &*P45,
-            Chance::P65 => &*P35,
-            Chance::P75 => &*P25,
-        }
-    }
-}
-
-impl From<usize> for Chance {
-    fn from(chance: usize) -> Self {
-        match chance {
-            0 | 25 => Chance::P25,
-            1 | 35 => Chance::P35,
-            2 | 45 => Chance::P45,
-            3 | 55 => Chance::P55,
-            4 | 65 => Chance::P65,
-            5 | 75 => Chance::P75,
-            value => panic!("Illegal value for `Chance`: {}", value),
+            Chance::P25 => 15,
+            Chance::P35 => 13,
+            Chance::P45 => 11,
+            Chance::P55 => 9,
+            Chance::P65 => 7,
+            Chance::P75 => 5,
         }
     }
 }
@@ -156,9 +128,9 @@ const ROLLS: u8 = 10;
 const GOOD: u8 = 7;
 const BAD: u8 = 4;
 
-pub fn evaluate(stone: Stone) -> (usize, BigRational) {
+pub fn evaluate(stone: Stone) -> (usize, u128) {
     let mut max_line = 0;
-    let mut max_value = ZERO.clone();
+    let mut max_value = u128::from(0u8);
     let mut cache = HashMap::new();
 
     for line in 0..3 {
@@ -169,30 +141,30 @@ pub fn evaluate(stone: Stone) -> (usize, BigRational) {
         }
     }
 
-    (max_line, max_value.clone())
+    (max_line, max_value)
 }
 
-fn recurse_weighted(
-    stone: Stone,
-    cache: &mut HashMap<Stone, BigRational>,
-    line: usize,
-) -> BigRational {
-    recurse(stone.succeed(line), cache) * stone.chance.to_probability_success()
-        + recurse(stone.fail(line), cache) * stone.chance.to_probability_failure()
+fn recurse_weighted(stone: Stone, cache: &mut HashMap<Stone, u128>, line: usize) -> u128 {
+    let success = recurse(stone.succeed(line), cache).checked_mul(stone.chance.success());
+    let failure = recurse(stone.fail(line), cache).checked_mul(stone.chance.failure());
+    success
+        .zip(failure)
+        .and_then(|(success, failure)| success.checked_add(failure))
+        .expect("[INTERNAL ERROR]: probability overflowed u128")
 }
 
-fn recurse(stone: Stone, cache: &mut HashMap<Stone, BigRational>) -> BigRational {
+fn recurse(stone: Stone, cache: &mut HashMap<Stone, u128>) -> u128 {
     if let Some(value) = cache.get(&stone) {
-        return value.clone();
+        return *value;
     }
 
     // Terminal state: success
-    if stone.lines[0] >= GOOD
+    if stone.rolls.into_iter().all(|roll| roll == ROLLS)
+        && stone.lines[0] >= GOOD
         && stone.lines[1] >= GOOD
-        && stone.rolls[2] == ROLLS
         && stone.lines[2] <= BAD
     {
-        return ONE.clone();
+        return 1;
     }
 
     // Terminal state: failure
@@ -200,15 +172,15 @@ fn recurse(stone: Stone, cache: &mut HashMap<Stone, BigRational>) -> BigRational
         || ROLLS - stone.rolls[1] + stone.lines[1] < GOOD
         || stone.lines[2] > BAD
     {
-        return ZERO.clone();
+        return 0;
     }
 
     let max = (0..3)
         .filter(|line| stone.rolls[*line] < ROLLS)
         .map(|line| recurse_weighted(stone, cache, line))
         .max()
-        .unwrap_or_else(|| ZERO.clone());
+        .unwrap_or_default();
 
-    cache.insert(stone, max.clone());
+    cache.insert(stone, max);
     max
 }
