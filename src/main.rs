@@ -1,5 +1,5 @@
 fn main() {
-    let (_, probability) = facet::evaluate(facet::Stone::default());
+    let (_, probability) = facet::expectimax(facet::Stone::default());
 
     let numerator = probability / 10u128.pow(26);
     let denominator = 2u128.pow(30) * 10u128.pow(4);

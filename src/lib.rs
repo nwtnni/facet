@@ -128,13 +128,13 @@ const ROLLS: u8 = 10;
 const GOOD: u8 = 7;
 const BAD: u8 = 4;
 
-pub fn evaluate(stone: Stone) -> (usize, u128) {
+pub fn expectimax(stone: Stone) -> (usize, u128) {
     let mut max_line = 0;
     let mut max_value = u128::from(0u8);
     let mut cache = HashMap::new();
 
     for line in 0..3 {
-        let value = recurse_weighted(stone, &mut cache, line);
+        let value = select(stone, &mut cache, line);
         if value > max_value {
             max_line = line;
             max_value = value;
@@ -144,16 +144,7 @@ pub fn evaluate(stone: Stone) -> (usize, u128) {
     (max_line, max_value)
 }
 
-fn recurse_weighted(stone: Stone, cache: &mut HashMap<Stone, u128>, line: usize) -> u128 {
-    let success = recurse(stone.succeed(line), cache).checked_mul(stone.chance.success());
-    let failure = recurse(stone.fail(line), cache).checked_mul(stone.chance.failure());
-    success
-        .zip(failure)
-        .and_then(|(success, failure)| success.checked_add(failure))
-        .expect("[INTERNAL ERROR]: probability overflowed u128")
-}
-
-fn recurse(stone: Stone, cache: &mut HashMap<Stone, u128>) -> u128 {
+fn expected(stone: Stone, cache: &mut HashMap<Stone, u128>) -> u128 {
     if let Some(value) = cache.get(&stone) {
         return *value;
     }
@@ -177,10 +168,19 @@ fn recurse(stone: Stone, cache: &mut HashMap<Stone, u128>) -> u128 {
 
     let max = (0..3)
         .filter(|line| stone.rolls[*line] < ROLLS)
-        .map(|line| recurse_weighted(stone, cache, line))
+        .map(|line| select(stone, cache, line))
         .max()
         .unwrap_or_default();
 
     cache.insert(stone, max);
     max
+}
+
+fn select(stone: Stone, cache: &mut HashMap<Stone, u128>, line: usize) -> u128 {
+    let success = expected(stone.succeed(line), cache).checked_mul(stone.chance.success());
+    let failure = expected(stone.fail(line), cache).checked_mul(stone.chance.failure());
+    success
+        .zip(failure)
+        .and_then(|(success, failure)| success.checked_add(failure))
+        .expect("[INTERNAL ERROR]: probability overflowed u128")
 }
