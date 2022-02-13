@@ -1,5 +1,6 @@
-use std::collections::HashMap;
 use std::fmt;
+
+use rustc_hash::FxHashMap;
 
 uint::construct_uint! {
     pub struct U192(3);
@@ -148,7 +149,7 @@ pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> [U192; 3] {
 }
 
 struct Expectimax {
-    cache: HashMap<Stone, U192>,
+    cache: FxHashMap<Stone, U192>,
     lines: [u8; 3],
     rolls: [u8; 3],
 }
@@ -156,7 +157,7 @@ struct Expectimax {
 impl Expectimax {
     fn new(lines: [u8; 3], rolls: [u8; 3]) -> Self {
         Expectimax {
-            cache: HashMap::new(),
+            cache: FxHashMap::default(),
             lines,
             rolls,
         }
