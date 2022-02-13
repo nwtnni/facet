@@ -43,13 +43,13 @@ fn main() {
     for (line, value) in values.into_iter().enumerate() {
         const PRECISION: u32 = 5;
 
-        let numerator = value / 10u128.pow(depth - PRECISION);
+        let numerator = value / facet::U192::from(10u8).pow(facet::U192::from(depth - PRECISION));
         let denominator = 2u128.pow(depth) * 10u128.pow(PRECISION);
 
         println!(
             "Line {}: ({:.2$})",
             line,
-            numerator as f64 / denominator as f64,
+            numerator.as_u128() as f64 / denominator as f64,
             PRECISION as usize,
         );
     }

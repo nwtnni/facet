@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use std::fmt;
 
+uint::construct_uint! {
+    pub struct U192(3);
+}
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Stone {
     chance: Chance,
@@ -109,32 +113,32 @@ impl Chance {
         }
     }
 
-    pub fn success(&self) -> u128 {
-        match self {
+    pub fn success(&self) -> U192 {
+        U192::from(match self {
             Chance::P25 => 5,
             Chance::P35 => 7,
             Chance::P45 => 9,
             Chance::P55 => 11,
             Chance::P65 => 13,
             Chance::P75 => 15,
-        }
+        })
     }
 
-    pub fn failure(&self) -> u128 {
-        match self {
+    pub fn failure(&self) -> U192 {
+        U192::from(match self {
             Chance::P25 => 15,
             Chance::P35 => 13,
             Chance::P45 => 11,
             Chance::P55 => 9,
             Chance::P65 => 7,
             Chance::P75 => 5,
-        }
+        })
     }
 }
 
-pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> [u128; 3] {
+pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> [U192; 3] {
     let mut expectimax = Expectimax::new(lines, rolls);
-    let mut values = [0u128; 3];
+    let mut values = [U192::from(0); 3];
 
     for line in 0..3 {
         values[line] = expectimax.select(stone, line);
@@ -144,7 +148,7 @@ pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> [u128; 3] {
 }
 
 struct Expectimax {
-    cache: HashMap<Stone, u128>,
+    cache: HashMap<Stone, U192>,
     lines: [u8; 3],
     rolls: [u8; 3],
 }
@@ -158,13 +162,13 @@ impl Expectimax {
         }
     }
 
-    fn value(&self, stone: &Stone) -> Option<u128> {
+    fn value(&self, stone: &Stone) -> Option<U192> {
         // Impossible to reach goal for any one line
         if stone.lines[0] + self.rolls[0] - stone.rolls[0] < self.lines[0]
             || stone.lines[1] + self.rolls[1] - stone.rolls[1] < self.lines[1]
             || stone.lines[2] > self.lines[2]
         {
-            return Some(0);
+            return Some(U192::from(0));
         }
 
         // Successfully reached goal for all three lines
@@ -173,13 +177,13 @@ impl Expectimax {
             && stone.lines[1] >= self.lines[1]
             && stone.lines[2] <= self.lines[2]
         {
-            return Some(1);
+            return Some(U192::from(1));
         }
 
         None
     }
 
-    fn expected(&mut self, stone: Stone) -> u128 {
+    fn expected(&mut self, stone: Stone) -> U192 {
         if let Some(value) = self
             .cache
             .get(&stone)
@@ -200,7 +204,7 @@ impl Expectimax {
         max
     }
 
-    fn select(&mut self, stone: Stone, line: usize) -> u128 {
+    fn select(&mut self, stone: Stone, line: usize) -> U192 {
         let success = self
             .expected(stone.succeed(line))
             .checked_mul(stone.chance.success());
@@ -212,6 +216,6 @@ impl Expectimax {
         success
             .zip(failure)
             .and_then(|(success, failure)| success.checked_add(failure))
-            .expect("[INTERNAL ERROR]: probability overflowed u128")
+            .expect("[INTERNAL ERROR]: probability overflowed U192")
     }
 }
