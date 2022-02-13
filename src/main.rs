@@ -36,21 +36,16 @@ fn main() {
     };
 
     let stone = facet::Stone::new(chance, facet.current_lines, facet.current_rolls);
-    let depth = facet.target_rolls.into_iter().sum::<u8>() as u32
-        - facet.current_rolls.into_iter().sum::<u8>() as u32;
-    let values = facet::expectimax(stone, facet.target_lines, facet.target_rolls);
+    let (numerators, denominator) =
+        facet::expectimax(stone, facet.target_lines, facet.target_rolls);
 
-    for (line, value) in values.into_iter().enumerate() {
-        const PRECISION: u32 = 5;
+    for (line, numerator) in numerators.into_iter().enumerate() {
+        const PRECISION: u32 = 4;
 
-        let numerator = value / facet::U192::from(10u8).pow(facet::U192::from(depth - PRECISION));
-        let denominator = 2u128.pow(depth) * 10u128.pow(PRECISION);
+        let approximate = (numerator * facet::U192::from(10u64.pow(PRECISION)) / denominator)
+            .as_u64() as f64
+            / 10u64.pow(PRECISION) as f64;
 
-        println!(
-            "Line {}: ({:.2$})",
-            line,
-            numerator.as_u128() as f64 / denominator as f64,
-            PRECISION as usize,
-        );
+        println!("Line {}: ({:.2$})", line, approximate, PRECISION as usize);
     }
 }

@@ -1,11 +1,13 @@
 use std::fmt;
 
 use rustc_hash::FxHashMap;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 uint::construct_uint! {
     pub struct U192(3);
 }
 
+#[wasm_bindgen]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Stone {
     chance: Chance,
@@ -50,6 +52,26 @@ impl Stone {
     }
 }
 
+#[wasm_bindgen]
+impl Stone {
+    #[wasm_bindgen(constructor)]
+    pub fn new_wasm(
+        chance: Chance,
+        line_0: u8,
+        line_1: u8,
+        line_2: u8,
+        roll_0: u8,
+        roll_1: u8,
+        roll_2: u8,
+    ) -> Stone {
+        Stone {
+            chance,
+            lines: [line_0, line_1, line_2],
+            rolls: [roll_0, roll_1, roll_2],
+        }
+    }
+}
+
 impl fmt::Display for Stone {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}", self.chance)?;
@@ -60,14 +82,15 @@ impl fmt::Display for Stone {
     }
 }
 
+#[wasm_bindgen]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Chance {
-    P25,
-    P35,
-    P45,
-    P55,
-    P65,
-    P75,
+    P25 = 0,
+    P35 = 1,
+    P45 = 2,
+    P55 = 3,
+    P65 = 4,
+    P75 = 5,
 }
 
 impl fmt::Display for Chance {
@@ -137,15 +160,42 @@ impl Chance {
     }
 }
 
-pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> [U192; 3] {
+#[wasm_bindgen]
+pub fn expectimax_wasm(
+    stone: Stone,
+    line_0: u8,
+    line_1: u8,
+    line_2: u8,
+    roll_0: u8,
+    roll_1: u8,
+    roll_2: u8,
+    precision: u32,
+) -> Box<[f64]> {
+    let (numerators, denominator) =
+        expectimax(stone, [line_0, line_1, line_2], [roll_0, roll_1, roll_2]);
+
+    let inflate = U192::from(10u64.pow(precision));
+    let deflate = 10u64.pow(precision) as f64;
+
+    numerators
+        .into_iter()
+        .map(|numerator| (numerator * inflate / denominator).as_u64() as f64 / deflate)
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
+}
+
+pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> ([U192; 3], U192) {
     let mut expectimax = Expectimax::new(lines, rolls);
-    let mut values = [U192::from(0); 3];
+    let mut numerators = [U192::from(0u8); 3];
+    let denominator = U192::from(20u8).pow(U192::from(
+        rolls.into_iter().sum::<u8>() - stone.rolls.into_iter().sum::<u8>(),
+    ));
 
     for line in 0..3 {
-        values[line] = expectimax.select(stone, line);
+        numerators[line] = expectimax.select(stone, line);
     }
 
-    values
+    (numerators, denominator)
 }
 
 struct Expectimax {
