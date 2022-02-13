@@ -9,6 +9,14 @@ pub struct Stone {
 }
 
 impl Stone {
+    pub fn new(chance: Chance, lines: [u8; 3], rolls: [u8; 3]) -> Self {
+        Stone {
+            chance,
+            lines,
+            rolls,
+        }
+    }
+
     pub fn succeed(&self, line: usize) -> Self {
         let mut lines = self.lines;
         let mut rolls = self.rolls;
@@ -124,63 +132,86 @@ impl Chance {
     }
 }
 
-const ROLLS: u8 = 10;
-const GOOD: u8 = 7;
-const BAD: u8 = 4;
-
-pub fn expectimax(stone: Stone) -> (usize, u128) {
-    let mut max_line = 0;
-    let mut max_value = u128::from(0u8);
-    let mut cache = HashMap::new();
+pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> [u128; 3] {
+    let mut expectimax = Expectimax::new(lines, rolls);
+    let mut values = [0u128; 3];
 
     for line in 0..3 {
-        let value = select(stone, &mut cache, line);
-        if value > max_value {
-            max_line = line;
-            max_value = value;
+        values[line] = expectimax.select(stone, line);
+    }
+
+    values
+}
+
+struct Expectimax {
+    cache: HashMap<Stone, u128>,
+    lines: [u8; 3],
+    rolls: [u8; 3],
+}
+
+impl Expectimax {
+    fn new(lines: [u8; 3], rolls: [u8; 3]) -> Self {
+        Expectimax {
+            cache: HashMap::new(),
+            lines,
+            rolls,
         }
     }
 
-    (max_line, max_value)
-}
+    fn value(&self, stone: &Stone) -> Option<u128> {
+        // Impossible to reach goal for any one line
+        if stone.lines[0] + self.rolls[0] - stone.rolls[0] < self.lines[0]
+            || stone.lines[1] + self.rolls[1] - stone.rolls[1] < self.lines[1]
+            || stone.lines[2] > self.lines[2]
+        {
+            return Some(0);
+        }
 
-fn expected(stone: Stone, cache: &mut HashMap<Stone, u128>) -> u128 {
-    if let Some(value) = cache.get(&stone) {
-        return *value;
+        // Successfully reached goal for all three lines
+        if stone.rolls.into_iter().eq(self.rolls)
+            && stone.lines[0] >= self.lines[0]
+            && stone.lines[1] >= self.lines[1]
+            && stone.lines[2] <= self.lines[2]
+        {
+            return Some(1);
+        }
+
+        None
     }
 
-    // Terminal state: success
-    if stone.rolls.into_iter().all(|roll| roll == ROLLS)
-        && stone.lines[0] >= GOOD
-        && stone.lines[1] >= GOOD
-        && stone.lines[2] <= BAD
-    {
-        return 1;
+    fn expected(&mut self, stone: Stone) -> u128 {
+        if let Some(value) = self
+            .cache
+            .get(&stone)
+            .copied()
+            .or_else(|| self.value(&stone))
+        {
+            return value;
+        }
+
+        let rolls = self.rolls;
+        let max = (0..3)
+            .filter(|line| stone.rolls[*line] < rolls[*line])
+            .map(|line| self.select(stone, line))
+            .max()
+            .unwrap_or_default();
+
+        self.cache.insert(stone, max);
+        max
     }
 
-    // Terminal state: failure
-    if ROLLS - stone.rolls[0] + stone.lines[0] < GOOD
-        || ROLLS - stone.rolls[1] + stone.lines[1] < GOOD
-        || stone.lines[2] > BAD
-    {
-        return 0;
+    fn select(&mut self, stone: Stone, line: usize) -> u128 {
+        let success = self
+            .expected(stone.succeed(line))
+            .checked_mul(stone.chance.success());
+
+        let failure = self
+            .expected(stone.fail(line))
+            .checked_mul(stone.chance.failure());
+
+        success
+            .zip(failure)
+            .and_then(|(success, failure)| success.checked_add(failure))
+            .expect("[INTERNAL ERROR]: probability overflowed u128")
     }
-
-    let max = (0..3)
-        .filter(|line| stone.rolls[*line] < ROLLS)
-        .map(|line| select(stone, cache, line))
-        .max()
-        .unwrap_or_default();
-
-    cache.insert(stone, max);
-    max
-}
-
-fn select(stone: Stone, cache: &mut HashMap<Stone, u128>, line: usize) -> u128 {
-    let success = expected(stone.succeed(line), cache).checked_mul(stone.chance.success());
-    let failure = expected(stone.fail(line), cache).checked_mul(stone.chance.failure());
-    success
-        .zip(failure)
-        .and_then(|(success, failure)| success.checked_add(failure))
-        .expect("[INTERNAL ERROR]: probability overflowed u128")
 }
