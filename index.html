@@ -11,9 +11,9 @@
       grid-template-rows: repeat(3, 50px);
     }
 
-    #grid.rarity-6 { grid-template-columns: repeat(7, 50px); }
-    #grid.rarity-8 { grid-template-columns: repeat(9, 50px); }
-    #grid.rarity-9 { grid-template-columns: repeat(10, 50px); }
+    #grid.rarity-6 { grid-template-columns: repeat(6, 50px) 150px; }
+    #grid.rarity-8 { grid-template-columns: repeat(8, 50px) 150px; }
+    #grid.rarity-9 { grid-template-columns: repeat(9, 50px) 150px; }
     #grid.rarity-10 { grid-template-columns: repeat(10, 50px) 150px; }
 
     .grid-row-0 {
@@ -39,6 +39,38 @@
     .grid-row-0.grid-failure { color: rgb(87, 156, 201); }
     .grid-row-1.grid-failure { color: rgb(87, 156, 201); }
     .grid-row-2.grid-failure { color: rgb(214, 69, 59); }
+
+    .button-action {
+      font-size: 20px;
+      min-height: 40px;
+      min-width: 50px;
+      padding: 0;
+      margin: 0 10px;
+      background-color: white;
+      border-radius: 8px;
+      border-style: solid;
+    }
+
+    .button-action:hover {
+      background-color: Gainsboro;
+    }
+
+    .grid-row-0 .button-action { color: rgb(87, 156, 201); }
+    .grid-row-1 .button-action { color: rgb(87, 156, 201); }
+    .grid-row-2 .button-action { color: rgb(214, 69, 59);; }
+
+    .button-action.button-facet {
+      min-width: 120px;
+    }
+
+    .button-action.button-facet.button-facet-max {
+      border-color: rgb(204, 173, 0);
+      background-color: Gold;
+    }
+
+    .button-action.button-facet.button-facet-max:hover {
+      background-color: rgb(204, 173, 0);
+    }
     </style>
   </head>
   <body>
@@ -129,7 +161,8 @@
           for (let row = 0; row < 3; row++) {
             probability[row] = null;
             if (facetButtons[row]) {
-              facetButtons[row].textContent = "Facet";
+              facetButtons[row].textContent = "🔨";
+              facetButtons[row].classList.remove("button-facet-max");
             }
           }
         }
@@ -188,11 +221,11 @@
 
           for (let row = 0; row < 3; row++) {
             probability[row] = _probability[row];
-            facetButtons[row].textContent = "Facet (" + (probability[row] * 100).toFixed(2) + "%)";
+            facetButtons[row].textContent = "🔨 (" + (probability[row] * 100).toFixed(2) + "%)";
             if (row === max) {
-              facetButtons[row].classList.add("facet-max");
+              facetButtons[row].classList.add("button-facet-max");
             } else {
-              facetButtons[row].classList.remove("facet-max");
+              facetButtons[row].classList.remove("button-facet-max");
             }
           }
         }
@@ -261,21 +294,22 @@
             action.classList.add("grid-action");
 
             const facet = document.createElement("button");
-            facet.textContent = "Facet";
-            facet.className = "button-facet";
+            facet.textContent = "🔨";
+            facet.classList.add("button-facet");
+            facet.classList.add("button-action");
             facet.onclick = () => onFacet(row);
             facetButtons.push(facet);
             action.appendChild(facet);
 
             const success = document.createElement("button");
-            success.textContent = "Success";
-            success.className = "button-success";
+            success.textContent = "◆";
+            success.classList.add("button-action");
             success.onclick = () => onRecord(row, true);
             successButtons.push(success);
 
             const failure = document.createElement("button");
-            failure.textContent = "Failure";
-            failure.className = "button-failure";
+            failure.textContent = "◇";
+            failure.classList.add("button-action");
             failure.onclick = () => onRecord(row, false);
             failureButtons.push(failure);
 
