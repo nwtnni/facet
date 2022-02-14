@@ -95,7 +95,7 @@
 
     .control {
       font-size: 20px;
-      min-width: 200px;
+      min-width: 120px;
       min-height: 40px;
       margin: 10px;
     }
@@ -141,6 +141,7 @@
 
     <button id="start" class="control">Start</button>
     <button id="undo" class="control">Undo</button>
+    <button id="reset" class="control">Reset</button>
 
     <script type="module">
       import * as facet from "./pkg/facet.js";
@@ -490,9 +491,14 @@
           }
         }
 
-        rarity.onchange = () => resetGrid();
+        rarity.onchange = () => {
+          if (confirm("This will clear the grid. Are you sure you want to reset?")) {
+            resetGrid();
+          }
+        };
 
         document.getElementById("undo").onclick = () => onUndo();
+        document.getElementById("reset").onclick = rarity.onchange;
 
         resetGrid();
       });
