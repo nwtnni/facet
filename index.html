@@ -4,6 +4,22 @@
     <meta charset="utf-8">
     <title>Ability Stone Facet Calculator</title>
     <style>
+    .parameter {
+      display: block;
+      font-size: 20px;
+      margin: 10px 0;
+    }
+
+    select {
+      font-size: 20px;
+      max-width: 100px;
+    }
+
+    input {
+      font-size: 20px;
+      max-width: 100px;
+    }
+
     #grid {
       display: grid;
       justify-items: center;
@@ -74,25 +90,35 @@
     </style>
   </head>
   <body>
-    <label for="rarity">Ability stone rarity:</label>
-    <select id="rarity">
-      <option value="6">Rare</option>
-      <option value="8">Epic</option>
-      <option value="9">Legendary</option>
-      <option value="10" selected="selected">Relic</option>
-    </select>
+    <div class="parameter">
+      <label for="rarity">Ability stone rarity:</label>
+      <select id="rarity">
+        <option value="6">Rare</option>
+        <option value="8">Epic</option>
+        <option value="9">Legendary</option>
+        <option value="10" selected="selected">Relic</option>
+      </select>
+    </div>
 
-    <label for="target-line-0">Minimum roll for first line:</label>
-    <input type="number" class="target" id="target-line-0" min="0" max="10" value="7">
+    <div class="parameter">
+      <label for="target-line-0">Target minimum for first line:</label>
+      <input type="number" class="target" id="target-line-0" min="0" max="10" value="7">
+    </div>
 
-    <label for="target-line-1">Minimum roll for second line:</label>
-    <input type="number" class="target" id="target-line-1" min="0" max="10" value="7">
+    <div class="parameter">
+      <label for="target-line-1">Target minimum for second line:</label>
+      <input type="number" class="target" id="target-line-1" min="0" max="10" value="7">
+    </div>
 
-    <label for="target-line-2">Maximum roll for third line:</label>
-    <input type="number" class="target" id="target-line-2" min="0" max="10" value="4">
+    <div class="parameter">
+      <label for="target-line-2">Target maximum for third line:</label>
+      <input type="number" class="target" id="target-line-2" min="0" max="10" value="4">
+    </div>
 
-    <label for="chance">Current chance of success:</label>
-    <input type="number" id="chance" min="25" max="75" step="10" value="75">
+    <div class="parameter">
+      <label for="chance">Current chance of success:</label>
+      <input type="number" id="chance" min="25" max="75" step="10" value="75">
+    </div>
 
     <div id="grid">
     </div>
