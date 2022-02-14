@@ -88,11 +88,11 @@
       background-color: rgb(204, 173, 0);
     }
 
-    #start {
+    .control {
       font-size: 20px;
       min-width: 200px;
       min-height: 40px;
-      margin: 10px 0;
+      margin: 10px;
     }
     </style>
   </head>
@@ -130,7 +130,8 @@
     <div id="grid">
     </div>
 
-    <button id="start">Start</button>
+    <button id="start" class="control">Start</button>
+    <button id="undo" class="control">Undo</button>
 
     <script type="module">
       import * as facet from "./pkg/facet.js";
@@ -141,6 +142,7 @@
         const chance = document.getElementById("chance");
         const start = document.getElementById("start");
         const grid = document.getElementById("grid");
+        const undo = [];
 
         const facetButtons = [];
         const successButtons = [];
@@ -210,8 +212,19 @@
           }
         }
 
-        function resetTarget(row) {
-          target[row].value = Math.max(0, Math.min(getRarity(), getTarget(row)));
+        function resetUndo() {
+          undo.length = 0;
+        }
+
+        // Ensure chance is within [25, 35, ..., 75].
+        function clampChance(value) {
+          const clamped = Math.min(75, Math.max(25, value));
+          return Math.floor((clamped - 25) / 10) * 10 + 25;
+        }
+
+        // Ensure target is within [0, 1, ... rarity].
+        function clampTarget(value) {
+          return Math.max(0, Math.min(getRarity(), value));
         }
 
         // On a successful roll, the chance decreases by 10% to a minimum of 25%.
@@ -224,7 +237,21 @@
           }
         }
 
-        function updateProbability() {
+        function updateUndo(row) {
+          undo.push([
+            [target[0].previous, target[1].previous, target[2].previous],
+            chance.previous,
+            row,
+            [...probability],
+          ]);
+
+          chance.previous = chance.value;
+          for (let _row = 0; _row < 3; _row++) {
+            target[_row].previous = target[_row].value;
+          }
+        }
+
+        function computeProbability() {
           if (!getStart()) {
             return;
           }
@@ -250,10 +277,19 @@
             6,
           );
 
-          const max = _probability.indexOf(_probability.reduce((a, b) => Math.max(a, b)));
-
           for (let row = 0; row < 3; row++) {
             probability[row] = _probability[row];
+          }
+        }
+
+        function updateProbability() {
+          if (!getStart()) {
+            return;
+          }
+
+          const max = probability.indexOf(probability.reduce((a, b) => Math.max(a, b)));
+
+          for (let row = 0; row < 3; row++) {
             facetButtons[row].textContent = "🔨 (" + (probability[row] * 100).toFixed(2) + "%)";
             if (row === max) {
               facetButtons[row].classList.add("button-facet-max");
@@ -291,6 +327,8 @@
 
           stone[row].push(success);
           updateChance(success);
+          updateUndo(row);
+          computeProbability();
           updateProbability();
 
           for (let any = 0; any < 3; any++) {
@@ -300,13 +338,48 @@
           }
         }
 
+        function onUndo() {
+          if (undo.length === 0) {
+            return;
+          }
+
+          const [_target, _chance, row, _probability] = undo.pop();
+
+          if (row !== null) {
+            stone[row].pop();
+            const current = getCurrent(row);
+            current.textContent = "◇";
+            current.classList.remove("grid-success");
+            current.classList.remove("grid-failure");
+          }
+
+          chance.value = _chance;
+          chance.previous = _chance;
+
+          for (let row = 0; row < 3; row++) {
+            target[row].value = _target[row];
+            target[row].previous = _target[row];
+          }
+
+          if (_probability.every(defined => defined)) {
+            for (let row = 0; row < 3; row++) {
+              probability[row] = _probability[row];
+            }
+          } else {
+            computeProbability();
+          }
+
+          updateProbability();
+        }
+
         function resetGrid() {
           resetButtons();
           resetProbability();
           resetStart();
           resetStone();
+          resetUndo();
           for (let row = 0; row < 3; row++) {
-            resetTarget(row);
+            target[row].value = clampTarget(parseInt(target[row].value));
           }
 
           grid.textContent = "";
@@ -353,28 +426,46 @@
         start.onclick = () => {
           start.textContent = (start.textContent === "Start") ? "Stop" : "Start";
           if (getStart()) {
+            computeProbability();
             updateProbability();
           } else {
             resetProbability();
           }
         };
 
+        chance.previous = 75;
         chance.onchange = change => {
-          // Ensure chance is within [25, 35, ..., 75].
-          const value = Math.min(75, Math.max(25, parseInt(change.target.value)));
-          change.target.value = Math.floor((value - 25) / 10) * 10 + 25;
+          const previous = parseInt(chance.previous);
+          chance.value = clampChance(parseInt(chance.value));
 
+          if (previous === chance.value) {
+            return;
+          }
+
+          updateUndo(null);
+          computeProbability();
           updateProbability();
         };
 
         for (let row = 0; row < 3; row++) {
+          target[row].previous = (row === 2) ? 4 : 7;
           target[row].onchange = () => {
-            resetTarget(row);
+            const previous = parseInt(target[row].previous);
+            target[row].value = clampTarget(parseInt(target[row].value));
+
+            if (previous === target[row].value) {
+              return;
+            }
+
+            updateUndo(null);
+            computeProbability();
             updateProbability();
           }
         }
 
         rarity.onchange = () => resetGrid();
+
+        document.getElementById("undo").onclick = () => onUndo();
 
         resetGrid();
       });
