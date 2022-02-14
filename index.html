@@ -76,13 +76,22 @@
           return parseInt(rarity.value);
         }
 
-        // Get the currently active column in the grid row.
-        function getActive(row) {
+        // Get next slot to roll in row.
+        function getCurrent(row) {
           if (stone[row].length >= getRarity()) {
             return null;
           }
 
-          return grid.children[row * getRarity() + stone[row].length];
+          return grid.children[row * (getRarity() + 1) + stone[row].length];
+        }
+
+        // Get `div` containing action buttons (facet, success, failure) in row.
+        function getAction(row) {
+          if (stone[row].length >= getRarity()) {
+            return null;
+          }
+
+          return grid.children[row * (getRarity() + 1) + getRarity()];
         }
 
         // Return an ordinal within [0, 1, ..., 5] for compatibility with the Rust ABI.
@@ -177,28 +186,30 @@
         }
 
         function onFacet(row) {
-          const active = getActive(row);
-          active.appendChild(successButtons[row]);
-          active.appendChild(failureButtons[row]);
+          const action = getAction(row);
+          action.appendChild(successButtons[row]);
+          action.appendChild(failureButtons[row]);
 
           for (let any = 0; any < 3; any++) {
-            if (getActive(any)) {
-              getActive(any).removeChild(facetButtons[any]);
+            if (getAction(any)) {
+              getAction(any).removeChild(facetButtons[any]);
             }
           }
         }
 
         function onRecord(row, success) {
-          const active = getActive(row);
-          active.removeChild(successButtons[row]);
-          active.removeChild(failureButtons[row]);
+          const action = getAction(row);
+          action.removeChild(successButtons[row]);
+          action.removeChild(failureButtons[row]);
+
+          const current = getCurrent(row);
 
           if (success) {
-            active.classList.add("success");
-            active.textContent = "Success";
+            current.classList.add("success");
+            current.textContent = "Success";
           } else {
-            active.classList.add("failure");
-            active.textContent = "Failure";
+            current.classList.add("failure");
+            current.textContent = "Failure";
           }
 
           stone[row].push(success);
@@ -206,8 +217,8 @@
           updateProbability();
 
           for (let any = 0; any < 3; any++) {
-            if (getActive(any)) {
-              getActive(any).appendChild(facetButtons[any]);
+            if (getAction(any)) {
+              getAction(any).appendChild(facetButtons[any]);
             }
           }
         }
@@ -233,12 +244,16 @@
               grid.appendChild(div);
             }
 
+            const action = document.createElement("div");
+            action.classList.add("grid-row-" + row);
+            action.classList.add("grid-action");
+
             const facet = document.createElement("button");
             facet.textContent = "Facet";
             facet.className = "button-facet";
             facet.onclick = () => onFacet(row);
             facetButtons.push(facet);
-            getActive(row).appendChild(facetButtons[row]);
+            action.appendChild(facet);
 
             const success = document.createElement("button");
             success.textContent = "Success";
@@ -251,6 +266,8 @@
             failure.className = "button-failure";
             failure.onclick = () => onRecord(row, false);
             failureButtons.push(failure);
+
+            grid.appendChild(action);
           }
         }
 
