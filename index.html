@@ -8,11 +8,13 @@
       display: grid;
       justify-items: center;
       align-items: center;
-      justify-content: center;
-      align-content: start;
-      grid-template-columns: repeat(10, 1fr);
       grid-template-rows: repeat(3, 1fr);
     }
+
+    #grid.rarity-6 { grid-template-columns: repeat(7, 1fr); }
+    #grid.rarity-8 { grid-template-columns: repeat(9, 1fr); }
+    #grid.rarity-9 { grid-template-columns: repeat(10, 1fr); }
+    #grid.rarity-10 { grid-template-columns: repeat(11, 1fr); }
 
     .grid-row-0 {
       grid-row-start: 1;
@@ -220,6 +222,7 @@
           }
 
           grid.textContent = "";
+          grid.className = "rarity-" + getRarity();
 
           for (let row = 0; row < 3; row++) {
             for (let col = 0; col < getRarity(); col++) {
