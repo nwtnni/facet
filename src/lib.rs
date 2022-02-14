@@ -248,16 +248,16 @@ impl Expectimax {
 
         // Successfully reached goal for all three lines
         //
-        // Note: it's important that we don't short-circuit evaluation
-        // here at a shallower recursion depth. Because we don't explicitly
-        // calculate denominators, this `1` is only meaningful if all
-        // of them are summed at the deepest recursion depth.
-        if stone.rolls.into_iter().eq(self.rolls)
-            && stone.lines[0] >= self.lines[0]
+        // Note: because we don't explicitly keep track of the denominator
+        // when multiplying and adding probabilities, we need to account for it
+        // here if we short-circuit at a shallower recursion depth.
+        if stone.lines[0] >= self.lines[0]
             && stone.lines[1] >= self.lines[1]
             && stone.lines[2] <= self.lines[2]
+            && stone.rolls[2] == self.rolls[2]
         {
-            return Some(U192::from(1));
+            let height = self.rolls[0] + self.rolls[1] - stone.rolls[0] - stone.rolls[1];
+            return Some(U192::from(20u8).pow(U192::from(height)));
         }
 
         None
