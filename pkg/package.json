@@ -1,0 +1,12 @@
+{
+  "name": "facet",
+  "version": "0.1.0",
+  "files": [
+    "facet_bg.wasm",
+    "facet.js",
+    "facet.d.ts"
+  ],
+  "module": "facet.js",
+  "types": "facet.d.ts",
+  "sideEffects": false
+}
