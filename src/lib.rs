@@ -7,11 +7,17 @@ uint::construct_uint! {
     pub struct U192(3);
 }
 
+/// Represents the current state of an ability stone being faceted.
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Stone {
+    /// Current chance of success.
     chance: Chance,
+
+    /// Number of successful rolls per line.
     lines: [u8; 3],
+
+    /// Number of total attempts per line.
     rolls: [u8; 3],
 }
 
@@ -24,6 +30,7 @@ impl Stone {
         }
     }
 
+    /// State transition after succeeding a roll for `line`.
     pub fn succeed(&self, line: usize) -> Self {
         let mut lines = self.lines;
         let mut rolls = self.rolls;
@@ -38,6 +45,7 @@ impl Stone {
         }
     }
 
+    /// State transition after failing a roll for `line`.
     pub fn fail(&self, line: usize) -> Self {
         let lines = self.lines;
         let mut rolls = self.rolls;
@@ -54,6 +62,8 @@ impl Stone {
 
 #[wasm_bindgen]
 impl Stone {
+    // The WebAssembly ABI doesn't accept fixed-size arrays, so this is a
+    // workaround that avoids allocation and bounds checking.
     #[wasm_bindgen(constructor)]
     pub fn new_wasm(
         chance: Chance,
@@ -82,6 +92,7 @@ impl fmt::Display for Stone {
     }
 }
 
+/// Represents the set of valid success rates during faceting.
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Chance {
@@ -115,6 +126,7 @@ impl Default for Chance {
 }
 
 impl Chance {
+    /// State transition after succeeding a roll.
     pub fn succeed(&self) -> Self {
         match self {
             Chance::P25 => Chance::P25,
@@ -126,6 +138,7 @@ impl Chance {
         }
     }
 
+    /// State transition after failing a roll.
     pub fn fail(&self) -> Self {
         match self {
             Chance::P25 => Chance::P35,
@@ -137,6 +150,7 @@ impl Chance {
         }
     }
 
+    /// Probability of success, mulitplied by 20.
     pub fn success(&self) -> U192 {
         U192::from(match self {
             Chance::P25 => 5,
@@ -148,6 +162,7 @@ impl Chance {
         })
     }
 
+    /// Probability of failure, multiplied by 20.
     pub fn failure(&self) -> U192 {
         U192::from(match self {
             Chance::P25 => 15,
@@ -184,9 +199,16 @@ pub fn expectimax_wasm(
         .into_boxed_slice()
 }
 
+/// Compute the probability of reaching target `lines`, given limit `rolls`,
+/// current state `stone`, and optimal decision-making.
+///
+/// Returns the numerators for each choice, and the denominator for all three.
 pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> ([U192; 3], U192) {
     let mut expectimax = Expectimax::new(lines, rolls);
     let mut numerators = [U192::from(0u8); 3];
+
+    // The denominator is given by the 20 ^ (recursion depth), and the
+    // recursion depth is (# rolls available) - (# rolls used).
     let denominator = U192::from(20u8).pow(U192::from(
         rolls.into_iter().sum::<u8>() - stone.rolls.into_iter().sum::<u8>(),
     ));
@@ -205,6 +227,7 @@ struct Expectimax {
 }
 
 impl Expectimax {
+    /// Construct a new cache for evaluation.
     fn new(lines: [u8; 3], rolls: [u8; 3]) -> Self {
         Expectimax {
             cache: FxHashMap::default(),
@@ -213,6 +236,7 @@ impl Expectimax {
         }
     }
 
+    /// Compute the value of `stone`, if it is terminal.
     fn value(&self, stone: &Stone) -> Option<U192> {
         // Impossible to reach goal for any one line
         if stone.lines[0] + self.rolls[0] - stone.rolls[0] < self.lines[0]
@@ -223,6 +247,11 @@ impl Expectimax {
         }
 
         // Successfully reached goal for all three lines
+        //
+        // Note: it's important that we don't short-circuit evaluation
+        // here at a shallower recursion depth. Because we don't explicitly
+        // calculate denominators, this `1` is only meaningful if all
+        // of them are summed at the deepest recursion depth.
         if stone.rolls.into_iter().eq(self.rolls)
             && stone.lines[0] >= self.lines[0]
             && stone.lines[1] >= self.lines[1]
@@ -234,6 +263,7 @@ impl Expectimax {
         None
     }
 
+    /// Compute the maximum value for `stone`.
     fn expected(&mut self, stone: Stone) -> U192 {
         if let Some(value) = self
             .cache
@@ -255,6 +285,7 @@ impl Expectimax {
         max
     }
 
+    /// Compute the expected value for `stone` if this line is selected.
     fn select(&mut self, stone: Stone, line: usize) -> U192 {
         let success = self
             .expected(stone.succeed(line))
