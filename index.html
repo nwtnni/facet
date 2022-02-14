@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Ability Stone Facet Calculator</title>
+    <style>
+    #grid {
+      display: grid;
+      justify-items: center;
+      align-items: center;
+      justify-content: center;
+      align-content: start;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+    }
+
+    .grid-row-0 {
+      grid-row-start: 1;
+    }
+
+    .grid-row-1 {
+      grid-row-start: 2;
+    }
+
+    .grid-row-2 {
+      grid-row-start: 3;
+    }
+    </style>
+  </head>
+  <body>
+    <label for="rarity">Ability stone rarity:</label>
+    <select id="rarity">
+      <option value="6">Rare</option>
+      <option value="8">Epic</option>
+      <option value="9">Legendary</option>
+      <option value="10" selected="selected">Relic</option>
+    </select>
+
+    <label for="target-line-0">Minimum roll for first line:</label>
+    <input type="number" class="target" id="target-line-0" min="0" max="10" value="7">
+
+    <label for="target-line-1">Minimum roll for second line:</label>
+    <input type="number" class="target" id="target-line-1" min="0" max="10" value="7">
+
+    <label for="target-line-2">Maximum roll for third line:</label>
+    <input type="number" class="target" id="target-line-2" min="0" max="10" value="4">
+
+    <label for="chance">Current chance of success:</label>
+    <input type="number" id="chance" min="25" max="75" step="10" value="75">
+
+    <div id="grid">
+    </div>
+
+    <button id="start">Start</button>
+
+    <script type="module">
+      import * as facet from "./pkg/facet.js";
+
+      facet.default().then(() => {
+        const rarity = document.getElementById("rarity");
+        const target = document.querySelectorAll(".target");
+        const chance = document.getElementById("chance");
+        const start = document.getElementById("start");
+        const grid = document.getElementById("grid");
+
+        const facetButtons = [];
+        const successButtons = [];
+        const failureButtons = [];
+
+        const stone = [[], [], []];
+        const probability = [null, null, null];
+
+        function getRarity() {
+          return parseInt(rarity.value);
+        }
+
+        // Get the currently active column in the grid row.
+        function getActive(row) {
+          if (stone[row].length >= getRarity()) {
+            return null;
+          }
+
+          return grid.children[row * getRarity() + stone[row].length];
+        }
+
+        // Return an ordinal within [0, 1, ..., 5] for compatibility with the Rust ABI.
+        function getChance() {
+          return Math.floor((parseInt(chance.value) - 25) / 10);
+        }
+
+        function getStart() {
+          return start.textContent === "Stop";
+        }
+
+        function getTarget(row) {
+          return parseInt(target[row].value);
+        }
+
+        function resetButtons() {
+          facetButtons.length = 0;
+          successButtons.length = 0;
+          failureButtons.length = 0;
+        }
+
+        function resetProbability() {
+          for (let row = 0; row < 3; row++) {
+            probability[row] = null;
+            if (facetButtons[row]) {
+              facetButtons[row].textContent = "Facet";
+            }
+          }
+        }
+
+        function resetStart() {
+          start.textContent = "Start";
+        }
+
+        function resetStone() {
+          for (let row of stone) {
+            row.length = 0;
+          }
+        }
+
+        function resetTarget(row) {
+          target[row].value = Math.max(0, Math.min(getRarity(), getTarget(row)));
+        }
+
+        // On a successful roll, the chance decreases by 10% to a minimum of 25%.
+        // On a failed roll, the chance increases by 10% to a maximum of 75%.
+        function updateChance(success) {
+          if (success) {
+            chance.value = Math.max(25, parseInt(chance.value) - 10);
+          } else {
+            chance.value = Math.min(75, parseInt(chance.value) + 10);
+          }
+        }
+
+        function updateProbability() {
+          if (!getStart()) {
+            return;
+          }
+
+          const _stone = new facet.Stone(
+            getChance(),
+            stone[0].reduce((a, b) => a + b, 0),
+            stone[1].reduce((a, b) => a + b, 0),
+            stone[2].reduce((a, b) => a + b, 0),
+            stone[0].length,
+            stone[1].length,
+            stone[2].length,
+          );
+
+          const _probability = facet.expectimax_wasm(
+            _stone,
+            getTarget(0),
+            getTarget(1),
+            getTarget(2),
+            getRarity(),
+            getRarity(),
+            getRarity(),
+            6,
+          );
+
+          const max = _probability.indexOf(_probability.reduce((a, b) => Math.max(a, b)));
+
+          for (let row = 0; row < 3; row++) {
+            probability[row] = _probability[row];
+            facetButtons[row].textContent = "Facet (" + (probability[row] * 100).toFixed(2) + "%)";
+            if (row === max) {
+              facetButtons[row].classList.add("facet-max");
+            } else {
+              facetButtons[row].classList.remove("facet-max");
+            }
+          }
+        }
+
+        function onFacet(row) {
+          const active = getActive(row);
+          active.appendChild(successButtons[row]);
+          active.appendChild(failureButtons[row]);
+
+          for (let any = 0; any < 3; any++) {
+            if (getActive(any)) {
+              getActive(any).removeChild(facetButtons[any]);
+            }
+          }
+        }
+
+        function onRecord(row, success) {
+          const active = getActive(row);
+          active.removeChild(successButtons[row]);
+          active.removeChild(failureButtons[row]);
+
+          if (success) {
+            active.classList.add("success");
+            active.textContent = "Success";
+          } else {
+            active.classList.add("failure");
+            active.textContent = "Failure";
+          }
+
+          stone[row].push(success);
+          updateChance(success);
+          updateProbability();
+
+          for (let any = 0; any < 3; any++) {
+            if (getActive(any)) {
+              getActive(any).appendChild(facetButtons[any]);
+            }
+          }
+        }
+
+        function resetGrid() {
+          resetButtons();
+          resetProbability();
+          resetStart();
+          resetStone();
+          for (let row = 0; row < 3; row++) {
+            resetTarget(row);
+          }
+
+          grid.textContent = "";
+
+          for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < getRarity(); col++) {
+              const div = document.createElement("div");
+              div.className = "grid-col";
+              div.classList.add("grid-row-" + row);
+
+              grid.appendChild(div);
+            }
+
+            const facet = document.createElement("button");
+            facet.textContent = "Facet";
+            facet.className = "button-facet";
+            facet.onclick = () => onFacet(row);
+            facetButtons.push(facet);
+            getActive(row).appendChild(facetButtons[row]);
+
+            const success = document.createElement("button");
+            success.textContent = "Success";
+            success.className = "button-success";
+            success.onclick = () => onRecord(row, true);
+            successButtons.push(success);
+
+            const failure = document.createElement("button");
+            failure.textContent = "Failure";
+            failure.className = "button-failure";
+            failure.onclick = () => onRecord(row, false);
+            failureButtons.push(failure);
+          }
+        }
+
+        start.onclick = () => {
+          start.textContent = (start.textContent === "Start") ? "Stop" : "Start";
+          if (getStart()) {
+            updateProbability();
+          } else {
+            resetProbability();
+          }
+        };
+
+        chance.onchange = change => {
+          // Ensure chance is within [25, 35, ..., 75].
+          const value = Math.min(75, Math.max(25, parseInt(change.target.value)));
+          change.target.value = Math.floor((value - 25) / 10) * 10 + 25;
+
+          updateProbability();
+        };
+
+        for (let row = 0; row < 3; row++) {
+          target[row].onchange = () => {
+            resetTarget(row);
+            updateProbability();
+          }
+        }
+
+        rarity.onchange = () => resetGrid();
+
+        resetGrid();
+      });
+    </script>
+  </body>
+</html>
