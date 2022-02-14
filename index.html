@@ -195,10 +195,33 @@
           return parseInt(target[row].value);
         }
 
+        // Ensure chance is within [25, 35, ..., 75].
+        function clampChance(value) {
+          const clamped = Math.min(75, Math.max(25, value));
+          return Math.floor((clamped - 25) / 10) * 10 + 25;
+        }
+
+        // Ensure target is within [0, 1, ... rarity].
+        function clampTarget(value) {
+          return Math.max(0, Math.min(getRarity(), value));
+        }
+
         function resetButtons() {
           facetButtons.length = 0;
           successButtons.length = 0;
           failureButtons.length = 0;
+        }
+
+        function resetChance() {
+          chance.value = 75;
+          chance.previous = 75;
+        }
+
+        function resetTarget() {
+          for (let row = 0; row < 3; row++) {
+            target[row].value = clampTarget(parseInt(target[row].value));
+            target[row].previous = target[row].value;
+          }
         }
 
         function resetProbability() {
@@ -223,17 +246,6 @@
 
         function resetUndo() {
           undo.length = 0;
-        }
-
-        // Ensure chance is within [25, 35, ..., 75].
-        function clampChance(value) {
-          const clamped = Math.min(75, Math.max(25, value));
-          return Math.floor((clamped - 25) / 10) * 10 + 25;
-        }
-
-        // Ensure target is within [0, 1, ... rarity].
-        function clampTarget(value) {
-          return Math.max(0, Math.min(getRarity(), value));
         }
 
         // On a successful roll, the chance decreases by 10% to a minimum of 25%.
@@ -384,13 +396,12 @@
 
         function resetGrid() {
           resetButtons();
+          resetChance();
           resetProbability();
           resetStart();
           resetStone();
+          resetTarget();
           resetUndo();
-          for (let row = 0; row < 3; row++) {
-            target[row].value = clampTarget(parseInt(target[row].value));
-          }
 
           grid.textContent = "";
           grid.className = "rarity-" + getRarity();
