@@ -296,12 +296,13 @@
             return;
           }
 
-          const max = probability.indexOf(probability.reduce((a, b) => Math.max(a, b)));
+          let max = probability.reduce((a, b) => Math.max(a, b));
 
           for (let row = 0; row < 3; row++) {
             facetButtons[row].textContent = "🔨 (" + (probability[row] * 100).toFixed(2) + "%)";
-            if (row === max) {
+            if (probability[row] === max && getAction(row)) {
               facetButtons[row].classList.add("button-facet-max");
+              max = null;
             } else {
               facetButtons[row].classList.remove("button-facet-max");
             }
