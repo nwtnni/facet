@@ -159,6 +159,7 @@
 
         const stone = [[], [], []];
         const probability = [null, null, null];
+        let faceting = false;
 
         function getRarity() {
           return parseInt(rarity.value);
@@ -325,6 +326,7 @@
           const action = getAction(row);
           action.appendChild(successButtons[row]);
           action.appendChild(failureButtons[row]);
+          faceting = true;
 
           for (let any = 0; any < 3; any++) {
             if (getAction(any)) {
@@ -337,6 +339,7 @@
           const action = getAction(row);
           action.removeChild(successButtons[row]);
           action.removeChild(failureButtons[row]);
+          faceting = false;
 
           const current = getCurrent(row);
 
@@ -373,6 +376,9 @@
             current.textContent = "◇";
             current.classList.remove("grid-success");
             current.classList.remove("grid-failure");
+            if (!faceting) {
+              getAction(row).appendChild(facetButtons[row]);
+            }
           }
 
           chance.value = _chance;
