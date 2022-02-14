@@ -8,13 +8,13 @@
       display: grid;
       justify-items: center;
       align-items: center;
-      grid-template-rows: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 50px);
     }
 
-    #grid.rarity-6 { grid-template-columns: repeat(7, 1fr); }
-    #grid.rarity-8 { grid-template-columns: repeat(9, 1fr); }
-    #grid.rarity-9 { grid-template-columns: repeat(10, 1fr); }
-    #grid.rarity-10 { grid-template-columns: repeat(11, 1fr); }
+    #grid.rarity-6 { grid-template-columns: repeat(7, 50px); }
+    #grid.rarity-8 { grid-template-columns: repeat(9, 50px); }
+    #grid.rarity-9 { grid-template-columns: repeat(10, 50px); }
+    #grid.rarity-10 { grid-template-columns: repeat(10, 50px) 150px; }
 
     .grid-row-0 {
       grid-row-start: 1;
@@ -27,6 +27,18 @@
     .grid-row-2 {
       grid-row-start: 3;
     }
+
+    .grid-col {
+      color: Gainsboro;
+      font-size: 50px;
+    }
+
+    .grid-row-0.grid-success { color: rgb(87, 156, 201); }
+    .grid-row-1.grid-success { color: rgb(87, 156, 201); }
+    .grid-row-2.grid-success { color: rgb(214, 69, 59); }
+    .grid-row-0.grid-failure { color: rgb(87, 156, 201); }
+    .grid-row-1.grid-failure { color: rgb(87, 156, 201); }
+    .grid-row-2.grid-failure { color: rgb(214, 69, 59); }
     </style>
   </head>
   <body>
@@ -205,11 +217,10 @@
           const current = getCurrent(row);
 
           if (success) {
-            current.classList.add("success");
-            current.textContent = "Success";
+            current.classList.add("grid-success");
+            current.textContent = "◆";
           } else {
-            current.classList.add("failure");
-            current.textContent = "Failure";
+            current.classList.add("grid-failure");
           }
 
           stone[row].push(success);
@@ -240,6 +251,7 @@
               const div = document.createElement("div");
               div.className = "grid-col";
               div.classList.add("grid-row-" + row);
+              div.textContent = "◇";
 
               grid.appendChild(div);
             }
