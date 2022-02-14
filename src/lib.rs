@@ -274,9 +274,7 @@ impl Expectimax {
             return value;
         }
 
-        let rolls = self.rolls;
         let max = (0..3)
-            .filter(|line| stone.rolls[*line] < rolls[*line])
             .map(|line| self.select(stone, line))
             .max()
             .unwrap_or_default();
@@ -287,6 +285,10 @@ impl Expectimax {
 
     /// Compute the expected value for `stone` if this line is selected.
     fn select(&mut self, stone: Stone, line: usize) -> U192 {
+        if stone.rolls[line] >= self.rolls[line] {
+            return U192::from(0u8);
+        }
+
         let success = self
             .expected(stone.succeed(line))
             .checked_mul(stone.chance.success());
