@@ -548,9 +548,13 @@
           updateProbability();
         }
 
+        rarity.previous = rarity.value;
         rarity.onchange = () => {
-          if (confirm("This will clear the grid. Are you sure you want to reset?")) {
+          if (stone.every(line => line.length === 0) || confirm("This will clear the grid. Are you sure you want to reset?")) {
+            rarity.previous = rarity.value;
             resetGrid();
+          } else {
+            rarity.value = rarity.previous;
           }
         };
 
