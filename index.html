@@ -17,7 +17,7 @@
 
     select {
       font-size: 20px;
-      max-width: 100px;
+      max-width: 200px;
     }
 
     input {
@@ -99,6 +99,16 @@
       min-height: 40px;
       margin: 10px;
     }
+
+    #instructions-toggle { color: Black; }
+    #instructions-toggle:hover { color: rgb(87, 156, 201); }
+    #instructions { max-width: 510px; }
+    #instructions ol li { margin: 10px 0; }
+
+    .hidden {
+      display: none;
+      overflow: hidden;
+    }
     </style>
   </head>
   <body>
@@ -107,12 +117,37 @@
     </div>
 
     <div class="parameter">
+      <div id="instructions-toggle">Expand instructions: ►</div>
+      <div id="instructions" class="hidden">
+        <p>
+          This calculator shows the <b>maximum probability</b> of achieving a <b>completed</b> stone
+          that satisfies <b>all</b> chosen minimum and maximum values. This probability is only accurate
+          if you select the calculator's optimal choice at <b>every</b> step. For basic usage:
+        </p>
+        <ol>
+          <li>Select rarity tier (number of slots per line).</li>
+          <li>Select target values for each line.</li>
+          <li>If your stone already has filled slots, facet the grid to match it using the hammer buttons on the right.</li>
+          <li><b>Click the Start button to begin calculating probabilities.</b></li>
+          <li>Each hammer shows the maximum probability of achieving the goal if you facet that line next.</li>
+          <li>Record the in-game outcome (success or failure) after clicking a hammer.</li>
+          <li>Repeat (5) - (6) with updated probabilities.</li>
+        </ol>
+        <p>
+          For example, clicking <b>Start</b> with the default settings shows that
+          there is a 4.81% chance of ending up with a 7+/7+/4- ability stone if you
+          choose line one first, but only a 2.86% chance if you choose line three first.
+        </p>
+      </div>
+    </div>
+
+    <div class="parameter">
       <label for="rarity">Ability stone rarity:</label>
       <select id="rarity">
-        <option value="6">Rare</option>
-        <option value="8">Epic</option>
-        <option value="9">Legendary</option>
-        <option value="10" selected="selected">Relic</option>
+        <option value="6">Rare (6)</option>
+        <option value="8">Epic (8)</option>
+        <option value="9">Legendary (9)</option>
+        <option value="10" selected="selected">Relic (10)</option>
       </select>
     </div>
 
@@ -152,6 +187,8 @@
       import * as facet from "./pkg/facet.js";
 
       facet.default().then(() => {
+        const instructionsToggle = document.getElementById("instructions-toggle")
+        const instructions = document.getElementById("instructions")
         const rarity = document.getElementById("rarity");
         const target = document.querySelectorAll(".target");
         const chance = document.getElementById("chance");
@@ -519,6 +556,16 @@
 
         document.getElementById("undo").onclick = () => onUndo();
         document.getElementById("reset").onclick = rarity.onchange;
+
+        instructionsToggle.onclick = () => {
+          if (instructionsToggle.textContent.startsWith("Expand")) {
+            instructions.classList.remove("hidden");
+            instructionsToggle.textContent = "Collapse instructions: ▼"
+          } else {
+            instructions.classList.add("hidden");
+            instructionsToggle.textContent = "Expand instructions: ►"
+          }
+        };
 
         resetGrid();
       });
