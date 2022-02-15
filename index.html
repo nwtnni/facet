@@ -32,10 +32,10 @@
       grid-template-rows: repeat(3, 50px);
     }
 
-    #grid.rarity-6 { grid-template-columns: repeat(6, 50px) 150px; }
-    #grid.rarity-8 { grid-template-columns: repeat(8, 50px) 150px; }
-    #grid.rarity-9 { grid-template-columns: repeat(9, 50px) 150px; }
-    #grid.rarity-10 { grid-template-columns: repeat(10, 50px) 150px; }
+    #grid.rarity-6 { grid-template-columns: repeat(6, 50px) 260px; }
+    #grid.rarity-8 { grid-template-columns: repeat(8, 50px) 260px; }
+    #grid.rarity-9 { grid-template-columns: repeat(9, 50px) 260px; }
+    #grid.rarity-10 { grid-template-columns: repeat(10, 50px) 260px; }
 
     .grid-row-0 {
       grid-row-start: 1;
@@ -64,7 +64,7 @@
     .button-action {
       font-size: 20px;
       min-height: 40px;
-      min-width: 50px;
+      min-width: 110px;
       padding: 0;
       margin: 0 10px;
       background-color: white;
@@ -81,7 +81,7 @@
     .grid-row-2 .button-action { color: rgb(214, 69, 59);; }
 
     .button-action.button-facet {
-      min-width: 120px;
+      min-width: 220px;
     }
 
     .button-action.button-facet.button-facet-max {
@@ -136,6 +136,11 @@
       <input type="number" id="chance" min="25" max="75" step="10" value="75">
     </div>
 
+    <div class="parameter">
+      <label for="chance">Probability precision (decimal places to display):</label>
+      <input type="number" id="precision" min="0" max="10" step="1" value="2">
+    </div>
+
     <div id="grid">
     </div>
 
@@ -150,6 +155,7 @@
         const rarity = document.getElementById("rarity");
         const target = document.querySelectorAll(".target");
         const chance = document.getElementById("chance");
+        const precision = document.getElementById("precision");
         const start = document.getElementById("start");
         const grid = document.getElementById("grid");
         const undo = [];
@@ -189,6 +195,10 @@
           return Math.floor((parseInt(chance.value) - 25) / 10);
         }
 
+        function getPrecision() {
+          return parseInt(precision.value);
+        }
+
         function getStart() {
           return start.textContent === "Stop";
         }
@@ -206,6 +216,10 @@
         // Ensure target is within [0, 1, ... rarity].
         function clampTarget(value) {
           return Math.max(0, Math.min(getRarity(), value));
+        }
+
+        function clampPrecision(value) {
+          return Math.max(0, Math.min(10, value));
         }
 
         function resetButtons() {
@@ -297,7 +311,7 @@
             getRarity(),
             getRarity(),
             getRarity(),
-            6,
+            12,
           );
 
           for (let row = 0; row < 3; row++) {
@@ -313,7 +327,8 @@
           let max = probability.reduce((a, b) => Math.max(a, b));
 
           for (let row = 0; row < 3; row++) {
-            facetButtons[row].textContent = "🔨 (" + (probability[row] * 100).toFixed(2) + "%)";
+            const percentage = probability[row] * 100.0;
+            facetButtons[row].textContent = "🔨 (" + percentage.toFixed(getPrecision()) + "%)";
             if (probability[row] === max && getAction(row)) {
               facetButtons[row].classList.add("button-facet-max");
               max = null;
@@ -489,6 +504,11 @@
             computeProbability();
             updateProbability();
           }
+        }
+
+        precision.onchange = () => {
+          precision.value = clampPrecision(getPrecision());
+          updateProbability();
         }
 
         rarity.onchange = () => {
