@@ -1,6 +1,6 @@
+use std::cmp;
 use std::fmt;
 
-use rustc_hash::FxHashMap;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 uint::construct_uint! {
@@ -126,6 +126,17 @@ impl Default for Chance {
 }
 
 impl Chance {
+    pub fn all() -> [Chance; 6] {
+        [
+            Chance::P25,
+            Chance::P35,
+            Chance::P45,
+            Chance::P55,
+            Chance::P65,
+            Chance::P75,
+        ]
+    }
+
     /// State transition after succeeding a roll.
     pub fn succeed(&self) -> Self {
         match self {
@@ -214,92 +225,134 @@ pub fn expectimax(stone: Stone, lines: [u8; 3], rolls: [u8; 3]) -> ([U192; 3], U
     ));
 
     for line in 0..3 {
-        numerators[line] = expectimax.select(stone, line);
+        numerators[line] = expectimax.select(&stone, line);
     }
 
     (numerators, denominator)
 }
 
 struct Expectimax {
-    cache: FxHashMap<Stone, U192>,
+    cache: Vec<U192>,
     lines: [u8; 3],
     rolls: [u8; 3],
+    sizes: [usize; 3],
 }
 
 impl Expectimax {
     /// Construct a new cache for evaluation.
     fn new(lines: [u8; 3], rolls: [u8; 3]) -> Self {
-        Expectimax {
-            cache: FxHashMap::default(),
+        let mut sizes = [0; 3];
+
+        (0..3)
+            .map(|line| (rolls[line] + 1) * (rolls[line] + 2) / 2)
+            .zip(&mut sizes)
+            .for_each(|(_size, size)| *size = _size as usize);
+
+        let cache = vec![U192::MAX; sizes.into_iter().product::<usize>() * Chance::all().len()];
+
+        let mut expectimax = Expectimax {
+            cache,
             lines,
             rolls,
+            sizes,
+        };
+
+        expectimax.compute_terminal();
+        expectimax.compute_all();
+        expectimax
+    }
+
+    /// Mapping from state to unique index in global ordering.
+    fn index(&self, stone: &Stone) -> usize {
+        let mut index = stone.chance as usize;
+
+        for line in 0..3 {
+            let size = self.sizes[line];
+            let roll = stone.rolls[line] as usize;
+            let line = stone.lines[line] as usize;
+
+            index *= size;
+            index += roll * (roll + 1) / 2 + line;
+        }
+
+        index
+    }
+
+    fn compute_terminal(&mut self) {
+        for chance in Chance::all() {
+            for line_three in 0..self.rolls[2] + 1 {
+                for line_two in 0..self.rolls[1] + 1 {
+                    for line_one in 0..self.rolls[0] + 1 {
+                        let stone =
+                            Stone::new(chance, [line_one, line_two, line_three], self.rolls);
+
+                        let index = self.index(&stone);
+
+                        self.cache[index] = match stone.lines[0] >= self.lines[0]
+                            && stone.lines[1] >= self.lines[1]
+                            && stone.lines[2] <= self.lines[2]
+                        {
+                            true => U192::from(1u8),
+                            false => U192::from(0u8),
+                        };
+                    }
+                }
+            }
         }
     }
 
-    /// Compute the value of `stone`, if it is terminal.
-    fn value(&self, stone: &Stone) -> Option<U192> {
-        // Impossible to reach goal for any one line
-        if stone.lines[0] + self.rolls[0] - stone.rolls[0] < self.lines[0]
-            || stone.lines[1] + self.rolls[1] - stone.rolls[1] < self.lines[1]
-            || stone.lines[2] > self.lines[2]
-        {
-            return Some(U192::from(0));
+    fn compute_all(&mut self) {
+        for roll_total in (0..self.rolls.into_iter().sum::<u8>()).rev() {
+            let min_three = roll_total
+                .saturating_sub(self.rolls[1])
+                .saturating_sub(self.rolls[0]);
+            let max_three = cmp::min(roll_total, self.rolls[2]);
+
+            for roll_three in min_three..=max_three {
+                let min_two = roll_total
+                    .saturating_sub(roll_three)
+                    .saturating_sub(self.rolls[0]);
+                let max_two = cmp::min(roll_total - roll_three, self.rolls[1]);
+
+                for roll_two in min_two..=max_two {
+                    let roll_one = roll_total - roll_three - roll_two;
+
+                    for chance in Chance::all() {
+                        for line_three in (0..roll_three + 1).rev() {
+                            for line_two in (0..roll_two + 1).rev() {
+                                for line_one in (0..roll_one + 1).rev() {
+                                    let stone = Stone::new(
+                                        chance,
+                                        [line_one, line_two, line_three],
+                                        [roll_one, roll_two, roll_three],
+                                    );
+
+                                    let index = self.index(&stone);
+
+                                    if self.cache[index] < U192::MAX {
+                                        continue;
+                                    }
+
+                                    self.cache[index] = (0..3)
+                                        .map(|line| self.select(&stone, line))
+                                        .max()
+                                        .unwrap_or_default();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-
-        // Successfully reached goal for all three lines
-        //
-        // Note: because we don't explicitly keep track of the denominator
-        // when multiplying and adding probabilities, we need to account for it
-        // here if we short-circuit at a shallower recursion depth.
-        if stone.lines[0] >= self.lines[0]
-            && stone.lines[1] >= self.lines[1]
-            && stone.lines[2] <= self.lines[2]
-            && stone.rolls[2] == self.rolls[2]
-        {
-            let height = self.rolls[0] + self.rolls[1] - stone.rolls[0] - stone.rolls[1];
-            return Some(U192::from(20u8).pow(U192::from(height)));
-        }
-
-        None
-    }
-
-    /// Compute the maximum value for `stone`.
-    fn expected(&mut self, stone: Stone) -> U192 {
-        if let Some(value) = self
-            .cache
-            .get(&stone)
-            .copied()
-            .or_else(|| self.value(&stone))
-        {
-            return value;
-        }
-
-        let max = (0..3)
-            .map(|line| self.select(stone, line))
-            .max()
-            .unwrap_or_default();
-
-        self.cache.insert(stone, max);
-        max
     }
 
     /// Compute the expected value for `stone` if this line is selected.
-    fn select(&mut self, stone: Stone, line: usize) -> U192 {
+    fn select(&mut self, stone: &Stone, line: usize) -> U192 {
         if stone.rolls[line] >= self.rolls[line] {
             return U192::from(0u8);
         }
 
-        let success = self
-            .expected(stone.succeed(line))
-            .checked_mul(stone.chance.success());
-
-        let failure = self
-            .expected(stone.fail(line))
-            .checked_mul(stone.chance.failure());
-
-        success
-            .zip(failure)
-            .and_then(|(success, failure)| success.checked_add(failure))
-            .expect("[INTERNAL ERROR]: probability overflowed U192")
+        stone.chance.success() * self.cache[self.index(&stone.succeed(line))]
+            + stone.chance.failure() * self.cache[self.index(&stone.fail(line))]
     }
 }
